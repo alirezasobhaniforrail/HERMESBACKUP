@@ -1,0 +1,67 @@
+{
+  "crypto-trading-bot": {
+    "archived_at": null,
+    "created_at": "2026-07-26T09:28:04.355861+00:00",
+    "created_by": "agent",
+    "last_patched_at": "2026-07-26T19:25:44.964248+00:00",
+    "last_used_at": "2026-07-26T19:25:02.216078+00:00",
+    "last_viewed_at": "2026-07-26T19:25:02.211135+00:00",
+    "patch_count": 86,
+    "pinned": false,
+    "state": "active",
+    "use_count": 34,
+    "view_count": 34
+  },
+  "github-repo-management": {
+    "archived_at": null,
+    "created_at": "2026-07-26T08:00:34.244379+00:00",
+    "created_by": null,
+    "last_patched_at": null,
+    "last_used_at": "2026-07-26T08:00:34.253516+00:00",
+    "last_viewed_at": "2026-07-26T08:00:34.244402+00:00",
+    "patch_count": 0,
+    "pinned": false,
+    "state": "active",
+    "use_count": 1,
+    "view_count": 1
+  },
+  "hermes-agent": {
+    "archived_at": null,
+    "created_at": "2026-07-26T07:52:22.983543+00:00",
+    "created_by": null,
+    "last_patched_at": null,
+    "last_used_at": "2026-07-26T07:52:27.096923+00:00",
+    "last_viewed_at": "2026-07-26T07:52:27.092746+00:00",
+    "patch_count": 0,
+    "pinned": false,
+    "state": "active",
+    "use_count": 2,
+    "view_count": 2
+  },
+  "hermes-automation": {
+    "archived_at": null,
+    "created_at": "2026-07-26T07:53:17.311157+00:00",
+    "created_by": "agent",
+    "last_patched_at": "2026-07-26T07:53:48.570456+00:00",
+    "last_used_at": "2026-07-26T09:26:24.209759+00:00",
+    "last_viewed_at": "2026-07-26T09:26:24.205546+00:00",
+    "patch_count": 2,
+    "pinned": false,
+    "state": "active",
+    "use_count": 4,
+    "view_count": 4
+  },
+  "spike": {
+    "archived_at": null,
+    "created_at": "2026-07-26T10:21:34.233207+00:00",
+    "created_by": null,
+    "last_patched_at": null,
+    "last_used_at": "2026-07-26T10:21:34.241920+00:00",
+    "last_viewed_at": "2026-07-26T10:21:34.233235+00:00",
+    "patch_count": 0,
+    "pinned": false,
+    "state": "active",
+    "use_count": 1,
+    "view_count": 1
+  }
+}
