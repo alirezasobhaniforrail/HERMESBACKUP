@@ -1,0 +1,51 @@
+{
+  "symbol": "BTCUSDT",
+  "interval": "30m",
+  "leverage": 10,
+  "margin_mode": "CROSSED",
+
+  "rsi_period": 8,
+  "rsi_buy": 45,
+  "rsi_short": 55,
+  "ema_fast": 12,
+  "ema_mid": 21,
+  "ema_slow": 40,
+  "adx_threshold": 20,
+  "regime_adx": 18,
+  "vol_mult": 0.95,
+  "min_score": 6,
+
+  "buy_sl_pct": 0.005,
+  "buy_tp_pct": 0.035,
+  "short_sl_pct": 0.005,
+  "short_tp_pct": 0.035,
+  "trail_pct": 3.5,
+  "trail_activation_pct": 0.015,
+
+  "risk_pct": 5,
+  "max_hold": 72,
+  "cooldown": 0,
+  "min_order_usd": 10,
+
+  "use_range_filter": true,
+  "bb_width_thresh": 0.02,
+  "range_adx_thresh": 18,
+
+  "max_consecutive": 3,
+  "pause_bars": 192,
+  "cb_daily_dd_limit": 3.0,
+  "cb_pause_hours": 96,
+  "max_daily_loss_pct": 4.0,
+
+  "risk_decay": 0.5,
+
+  "slippage_pct": 0.0003,
+  "fee_pct": 0.0004,
+
+  "api_timeout": 60,
+  "api_max_retries": 3,
+
+  "dry_run": true,
+  "api_key": "",
+  "secret_key": ""
+}

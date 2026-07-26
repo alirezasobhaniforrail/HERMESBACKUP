@@ -1,0 +1,16 @@
+{
+  "equity": 1000.0,
+  "peak_equity": 1000.0,
+  "max_dd": 0.0,
+  "consecutive_losses": 0,
+  "circuit_pause_until": 0,
+  "daily_pnl": 0.0,
+  "day_start_equity": 1000.0,
+  "current_day": "2026-07-26",
+  "trade_log": [],
+  "monthly_pnl": {},
+  "monthly_trades": {},
+  "last_candle_time": 1785051000,
+  "position": null,
+  "total_trades": 0
+}
