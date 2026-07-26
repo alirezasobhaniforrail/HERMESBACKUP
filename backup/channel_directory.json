@@ -1,0 +1,13 @@
+{
+  "updated_at": "2026-07-26T07:48:40.483190",
+  "platforms": {
+    "telegram": [
+      {
+        "id": "8048000483",
+        "name": "ali One",
+        "type": "dm",
+        "thread_id": null
+      }
+    ]
+  }
+}
