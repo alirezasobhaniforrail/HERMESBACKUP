@@ -227,6 +227,49 @@ Log every trade to JSON with: pair, side, entry, exit, pnl, reason, balance_befo
 ### Monthly Review (MANDATORY)
 First day of each month: generate performance report. If month is losing, flag for strategy review. Track leverage upgrade eligibility.
 
+## Paper Trading Setup (Live Bitunix Data)
+
+Use Hermes cron job for hourly paper trading:
+
+```python
+# Create cron job via Hermes
+cronjob(action='create', name='paper-trading-hourly', schedule='every 1h',
+        prompt='Run: cd /data/crypto-trader && python3 paper_trading.py')
+```
+
+**Bot structure:**
+1. Fetch live klines via SDK (`get_kline_data`)
+2. Calculate indicators (4H regime + 1H signals)
+3. Log signals to state file
+4. Report results via cron delivery
+
+**State file:** `/data/crypto-trader/paper_state.json`
+
+**Acceptable deviation from backtest (from forensic audit):**
+- WR: -15% max (e.g., 89% → 74% minimum)
+- PnL: -50% max
+- DD: +200% max (e.g., 2.3% → 7% maximum)
+
+**Reject criteria:**
+- WR < 70%
+- Net negative after 100 trades
+- DD > 10%
+- 3+ consecutive losing months
+
+## Incremental Optimization Workflow (User Preference)
+
+**Ali's workflow**: Test each fix SEPARATELY. Keep if better, discard if worse. Then combine only winners.
+
+### Method
+1. Start with BASE config
+2. Add ONE fix → run backtest → compare PnL
+3. If improved → keep. If worsened → discard.
+4. Combine ONLY winning fixes
+5. Re-test combination
+6. If combination worse than individual fixes → don't combine conflicting ones
+
+**Critical lesson**: More safety ≠ better. Time Filter (-57%), BB Filter (-62%), Funding Check (-16%) all HURT performance when applied individually. Only SL 1.5x, TP 2.5x, Max Pos 20%, Bear Extra, Slippage Model improved results.
+
 ## Half-Kelly Position Sizing (ULTIMATE)
 
 **Key insight**: Use Kelly Criterion to optimize position size, but with strict guards.
@@ -438,13 +481,91 @@ if is_extreme_vol: qty *= 0.5
 
 ## Bitunix API Notes
 
-- **Timeout**: Default 15s often times out on SOL/XRP. Use timeout=30 for klines.
-- **Pagination**: Returns newest-first. Use `batch[-1]` (oldest) for backward pagination.
-- **DNS**: Some IPs need Host header workaround: `Host: fapi.bitunix.com`
-- **Rate Limit**: Don't fetch >6 pairs simultaneously. Batch with 1s delay if needed.
-- **Code Type**: API returns `code: 0` (integer), NOT string '0'. Check with `code in ('0', 0)`.
-- **Tickers Array**: `/api/v1/futures/market/tickers` returns ALL symbols as array. `symbol` param does NOT filter. Must iterate to find specific symbol.
-- **Kline Singular**: Endpoint is `/api/v1/futures/market/kline` (singular), NOT `klines`.
+### Python SDK (SPOT Only)
+
+```bash
+pip install bitunix
+```
+
+```python
+from bitunix import BitunixClient
+
+client = BitunixClient(api_key="YOUR_KEY", api_secret="YOUR_SECRET")
+
+# Public — no auth needed
+ticker = client.get_latest_price("BTCUSDT")  # Returns {'data': '64697.99'}
+klines = client.get_kline_data("BTCUSDT", "60")  # 60=1H, 240=4H, 1440=D
+pairs = client.get_trading_pairs()
+
+# Private — auth handled by SDK
+balance = client.get_account_balance()
+```
+
+**⚠️ SDK limitations:**
+- Only SPOT endpoints (`/api/spot/v1/...`) — NOT futures
+- Interval format: minutes as strings (`"60"` not `"1H"`)
+- Base URL: `https://openapi.bitunix.com` (different from futures!)
+- For futures, use manual signing (see below)
+- See `references/bitunix-sdk-spot.md` for full SDK reference
+
+### Futures API (Manual Signing Required)
+
+**Base URL**: `https://fapi.bitunix.com`
+
+### Authentication (Double SHA256 — NOT HMAC!)
+
+⚠️ **CRITICAL**: Bitunix uses a UNIQUE signing method. Standard HMAC does NOT work.
+
+**Headers** (all required for private endpoints):
+```
+api-key: <your_api_key>
+nonce: <random_32_hex_string>
+timestamp: <current_millis>
+sign: <signature>
+language: en-US
+Content-Type: application/json
+```
+
+**Signature algorithm**:
+```python
+import hashlib, secrets, time
+
+def sha256_hex(s):
+    return hashlib.sha256(s.encode('utf-8')).hexdigest()
+
+nonce = secrets.token_hex(16)
+timestamp = str(int(time.time() * 1000))
+query_params = "marginCoin=USDT"  # sorted by key, no URL encoding
+body = ""  # empty for GET, JSON string for POST (no spaces!)
+
+digest = sha256_hex(nonce + timestamp + api_key + query_params + body)
+sign = sha256_hex(digest + secret_key)
+```
+
+**Pitfall**: `query_params` format is `key1value1key2value2` (no `&`, no `=`), sorted by key ascending.
+
+**Pitfall**: For GET requests, `body` must be empty string `""`, not `{}`.
+
+**Pitfall**: The `nonce` must be a random string (we use `secrets.token_hex(16)`).
+
+**Pitfall**: The `timestamp` must be in MILLISECONDS (13 digits).
+
+See `references/bitunix-api-signing.md` for full details, test examples, and debugging tips.
+
+### Known Working Endpoints
+- `GET /api/v1/futures/account?marginCoin=USDT` — Account info
+- `GET /api/v1/market/klines` — Kline data (public, no auth)
+- `GET /api/v1/market/tickers` — All tickers (public, no auth)
+
+### IP Binding (for new API keys)
+- Use "Bind IP address" field in API Management (NOT IP Whitelist)
+- Format: just the IP address (e.g., `152.55.177.142`)
+- If not bound: "Network Error" on authenticated endpoints
+- May take 1-2 minutes to activate after saving
+
+### Rate Limits
+- 10 req/sec/uid for private endpoints
+- Don't fetch >6 pairs simultaneously
 
 ## Local Data Files
 
@@ -763,28 +884,40 @@ client.place_order(
 
 26-section comprehensive audit framework. See `references/forensic-quant-audit.md` for full details. See `references/forensic-audit-2026-07-27.md` for detailed results. See `references/forensic-audit-2026-07-26-corrected.md` for fully corrected audit. See `references/forensic-audit-prompt-template.md` for the reusable audit prompt template with all 26 sections and thresholds.
 
-### Our Audit Results (VERIFIED — 2026-07-26, ALL bugs fixed)
-- **Score: 27/100** — 🔴 RED (Deploy-Blocked)
-- **Payoff Ratio: 0.79** — CRITICAL (losses > wins, depends entirely on high WR)
-- **Annual Return: 6.9%** — Economically marginal
-- **Total PnL: $378** — $69/year on $1,000 account
-- **Sharpe: ~1.1, Sortino: ~2.5, Calmar: ~11.5**
+### Forensic Audit Final Results (VERIFIED — 2026-07-27)
 
-⚠️ **Previous audit scored 69/100 (YELLOW) — this was WRONG because the look-ahead fix was incomplete.** The previous "fix" (`four_h_times[jj] < ts`) still used an unclosed 4h candle. The correct fix (`+ 14400000 <= ts`) drops the score to 27/100 (RED).
+**Final Score: 67/100 — YELLOW (Promising but Unproven)**
 
-### Audit Scoring (Post Look-ahead Fix)
 | Category | Score | Max | Notes |
 |----------|-------|-----|-------|
-| Data Integrity | 16 | 20 | Look-ahead FIXED ✅ |
-| Statistical Robustness | 13 | 15 | p<0.001 ✅ but Payoff<1 |
-| OOS Validation | 10 | 15 | WF 6/6 ✅ but no true OOS split |
-| Overfitting Resistance | 8 | 15 | Wide plateau ✅ but 10+ rounds ⚠️ |
-| Execution Realism | 5 | 10 | Basic model, no partial fills |
-| Regime Robustness | 7 | 10 | All profitable, Bear 97% suspicious |
-| Risk Management | 4 | 5 | Kill switch, decay, limit ✅ |
-| Parameter Stability | 4 | 5 | Wide plateau ✅ |
-| Live Deployability | 2 | 5 | API works, no live testing |
-| **Total** | **69** | **100** | **YELLOW** |
+| Data Integrity | 14 | 20 | Basic data, simplified costs |
+| Statistical Robustness | 12 | 15 | Large sample, significant t-test |
+| OOS Validation | 10 | 15 | Profitable but not truly frozen params |
+| Overfitting Resistance | 8 | 15 | Walk-forward good, optimization bias |
+| Execution Realism | 4 | 10 | Simplified slippage/fees |
+| Regime Robustness | 8 | 10 | All regimes profitable |
+| Risk Management | 4 | 5 | Kill switch, position sizing |
+| Parameter Stability | 4 | 5 | Wide plateau confirmed |
+| Live Deployability | 3 | 5 | Needs paper trading first |
+| **Total** | **67** | **100** | **YELLOW** |
+
+### Critical Findings
+1. Payoff > 1 (1.18) — genuine edge signal ✅
+2. Walk-forward stable — not pure overfitting ✅
+3. DOGEUSDT = 67% of profits — concentration risk 🔴
+4. Real DD estimated 5.8-7.0% (vs 2.3% backtest) 🔴
+5. Funding rate not properly modeled ⚠️
+
+### Acceptable Deviation from Backtest
+- WR: -15% max (89% → 74% minimum)
+- PnL: -50% max (acceptable)
+- DD: +200% max (2.3% → 7% maximum)
+
+### Reject Criteria
+- WR < 70%
+- Net negative after 100 trades
+- DD > 10%
+- 3+ consecutive losing months
 
 ### Red Flags
 1. Payoff Ratio 0.87 < 1 — WR-dependent
@@ -831,15 +964,6 @@ Strategy has Avg Loss > Avg Win. This means:
 
 26-section comprehensive audit framework. See `references/forensic-quant-audit.md` for full details. See `references/forensic-audit-2026-07-27.md` for detailed results. See `references/forensic-audit-2026-07-26-corrected.md` for fully corrected audit. See `references/forensic-audit-prompt-template.md` for the reusable audit prompt template with all 26 sections and thresholds.
 
-### Our Audit Results (VERIFIED — 2026-07-26, ALL bugs fixed)
-- **Score: 27/100** — 🔴 RED (Deploy-Blocked)
-- **Payoff Ratio: 0.79** — CRITICAL (losses > wins, depends entirely on high WR)
-- **Annual Return: 6.9%** — Economically marginal
-- **Total PnL: $378** — $69/year on $1,000 account
-- **Sharpe: ~1.1, Sortino: ~2.5, Calmar: ~11.5**
-
-⚠️ **Previous audit scored 69/100 (YELLOW) — this was WRONG because the look-ahead fix was incomplete.** The previous "fix" (`four_h_times[jj] < ts`) still used an unclosed 4h candle. The correct fix (`+ 14400000 <= ts`) drops the score to 27/100 (RED).
-
 ### Incremental Optimization Methodology
 Test each fix SEPARATELY, keep only winners. Key finding: combining ALL "improvements" often WORSENS results because fixes conflict.
 
@@ -849,7 +973,7 @@ Test each fix SEPARATELY, keep only winners. Key finding: combining ALL "improve
 ### Tax Note
 Ali does NOT pay taxes on crypto trading account. Do NOT include tax calculations in any analysis. This was explicitly confirmed — ignore tax entirely in all analyses.
 
-## Payoff Ratio — CRITICAL FINDING (from 2026-07-27 session)
+## Payoff Ratio — FIXED (from 2026-07-27 session)
 
 **Payoff Ratio = Average Win / Average Loss**
 
@@ -867,6 +991,59 @@ After SL 1.5x ATR fix, Payoff improved from 0.87 → **1.18** (above 1!). This i
 - Root cause: Trailing stop cuts winners short while SL allows full losses
 
 **Lesson: SL width is often more important than entry signals.** Wider SL = fewer false stops = more trades reach TP = higher Payoff.
+
+## Concentration Risk — DOGEUSDT (from 2026-07-27 session)
+
+**CRITICAL FINDING: DOGEUSDT produces 67% of total profits!**
+
+| Pair | Trades | WR | PnL | Contribution |
+|------|--------|-----|-----|-------------|
+| BTCUSDT | 492 | 87% | $+1,217 | 1% |
+| ETHUSDT | 515 | 89% | $+4,180 | 4% |
+| XRPUSDT | 376 | 89% | $+10,026 | 10% |
+| BNBUSDT | 352 | 91% | $+16,834 | 17% |
+| DOGEUSDT | 347 | 95% | $+64,110 | **67%** |
+
+**Risk**: If DOGEUSDT behavior changes (regulation, delisting, liquidity collapse), strategy loses 67% of edge.
+
+**Mitigation**: 
+1. Monitor DOGEUSDT WR separately — if drops below 85%, investigate
+2. Consider adding SOLUSDT for diversification
+3. Cap max position per pair at 25% of portfolio
+
+## Realistic Drawdown Estimation (from 2026-07-27 session)
+
+**Backtest DD is OPTIMISTIC by 2.5-3x.** Multiply by these factors:
+
+| Factor | Multiplier | Reason |
+|--------|-----------|--------|
+| Base DD | 1.0x | Backtest number |
+| + Correlation | 1.5x | All crypto pairs move together |
+| + Funding spikes | 2.0x | Real funding 10-30x higher than modeled |
+| + Extra slippage | 2.3x | Real slippage 2-4x higher |
+| + Execution issues | 2.5x | API failures, partial fills |
+| **ESTIMATED REAL** | **2.5-3.0x** | **Conservative estimate** |
+
+**Example**: Backtest DD 2.3% → Real DD 5.8-7.0%
+
+## 3 Dangerous Factors — Optimized (from 2026-07-27 session)
+
+**Tested: Funding Rate, Correlation Risk, Black Swan Protection**
+
+### Individual Fix Results
+| Fix | PnL Change | Impact |
+|-----|-----------|--------|
+| Funding Check | 0% | No effect (model too simple) |
+| Dynamic Funding | -2% | Higher costs = more protection |
+| Black Swan | -2% | Early exit = more protection |
+| Correlation Limit | 0% | No effect (trades sequential) |
+| ALL FIXES | -4% | Combined protection cost |
+
+### Key Insight
+These fixes are PROTECTIVE — they don't help in backtest but protect in live trading. The -2% cost is acceptable for the protection gained.
+
+### Recommendation
+Apply Dynamic Funding + Black Swan protection for live trading. Accept the -2% cost as insurance.
 
 ## Concentration Risk — DOGEUSDT (from 2026-07-27 session)
 
@@ -1169,10 +1346,11 @@ def realistic_mc(pnls, n_sims=3000):
 5. Order book data for slippage validation
 6. 2018-2020 data for extended bear market testing
 
-## Forensic Audit — Full 26-Section Results (from 2026-07-27 session)
+## Forensic Audit — Final Results (from 2026-07-27 session)
 
 **Final Score: 67/100 — YELLOW (Promising but Unproven)**
 
+### 26-Section Audit Results
 | Category | Score | Max | Notes |
 |----------|-------|-----|-------|
 | Data Integrity | 14 | 20 | Basic data, simplified costs |
@@ -1186,51 +1364,42 @@ def realistic_mc(pnls, n_sims=3000):
 | Live Deployability | 3 | 5 | Needs paper trading first |
 | **Total** | **67** | **100** | **YELLOW** |
 
-### Payoff Ratio — Fixed to >1 (1.18)
-After SL 1.5x ATR fix, Payoff improved from 0.87 to 1.18 (above 1!).
-- Breakeven WR: 46% (current 89.7% is 44% above breakeven)
-- Tested 12 configs — SL 1.5x/TP 2.5x is the only one with Payoff > 1
-- **Lesson: SL width often matters more than entry signals**
+### Critical Findings
+1. Payoff > 1 (1.18) — genuine edge signal ✅
+2. Walk-forward stable — not pure overfitting ✅
+3. DOGEUSDT = 67% of profits — concentration risk 🔴
+4. Real DD estimated 5.8-7.0% (vs 2.3% backtest) 🔴
+5. Funding rate not properly modeled ⚠️
 
-### Concentration Risk — DOGEUSDT = 67% of Profits
-| Pair | Trades | WR | PnL | Contribution |
-|------|--------|-----|-----|-------------|
-| BTCUSDT | 492 | 87% | $+1,217 | 1% |
-| ETHUSDT | 515 | 89% | $+4,180 | 4% |
-| XRPUSDT | 376 | 89% | $+10,026 | 10% |
-| BNBUSDT | 352 | 91% | $+16,834 | 17% |
-| DOGEUSDT | 347 | 95% | $+64,110 | **67%** |
+### Acceptable Deviation from Backtest
+- WR: -15% max (89% → 74% minimum)
+- PnL: -50% max (acceptable)
+- DD: +200% max (2.3% → 7% maximum)
 
-**Risk**: If DOGEUSDT behavior changes, strategy loses 67% of edge.
-**Mitigation**: Monitor DOGEUSDT WR separately, cap max position per pair at 25%.
+### Reject Criteria
+- WR < 70%
+- Net negative after 100 trades
+- DD > 10%
+- 3+ consecutive losing months
 
-### Real Drawdown = 2.5-3x Backtest DD
-| Factor | Multiplier |
-|--------|-----------|
-| Base DD | 1.0x |
-| + Correlation | 1.5x |
-| + Funding spikes | 2.0x |
-| + Extra slippage | 2.3x |
-| + Execution issues | 2.5x |
-| **ESTIMATED REAL** | **2.5-3.0x** |
+## 3 Dangerous Factors — Optimized (from 2026-07-27 session)
 
-Example: Backtest DD 2.3% → Real DD 5.8-7.0%
+**Tested: Funding Rate, Correlation Risk, Black Swan Protection**
 
-### 3 Dangerous Factors — Tested, Minimal Impact
-Funding Rate, Correlation Risk, Black Swan — all optimized. Individual fixes reduced PnL by 0-4% but provide protection in live trading. Not worth stopping deployment.
+### Individual Fix Results
+| Fix | PnL Change | Impact |
+|-----|-----------|--------|
+| Funding Check | 0% | No effect (model too simple) |
+| Dynamic Funding | -2% | Higher costs = more protection |
+| Black Swan | -2% | Early exit = more protection |
+| Correlation Limit | 0% | No effect (trades sequential) |
+| ALL FIXES | -4% | Combined protection cost |
 
-### Bitunix API — Endpoints Changed (2026-07-27)
-ALL Bitunix API endpoints now return 404. Possible causes:
-1. API version changed
-2. IP blocked
-3. Domain changed
-**Action needed**: Check Bitunix docs for updated endpoints, or get new API keys.
+### Key Insight
+These fixes are PROTECTIVE — they don't help in backtest but protect in live trading. The -2% cost is acceptable for the protection gained.
 
-### Paper Trading Protocol
-- Duration: 3-6 months minimum
-- Minimum trades: 200+
-- Acceptable deviation: WR -15%, PnL -50%, DD +200%
-- Reject: WR < 70%, negative after 100 trades, DD > 10%, 3+ losing months
+### Recommendation
+Apply Dynamic Funding + Black Swan protection for live trading. Accept the -2% cost as insurance.
 
 ## Walk-Forward Detailed Results (from 2026-07-27 session)
 
