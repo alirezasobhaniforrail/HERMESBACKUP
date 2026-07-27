@@ -256,6 +256,32 @@ cronjob(action='create', name='paper-trading-hourly', schedule='every 1h',
 - DD > 10%
 - 3+ consecutive losing months
 
+### Working Paper Trading Implementation (2026-07-27 Session)
+**Active cron job:** `bitunix-paper-trading-2days` (every 60m, model: nvidiarail/openai-api)
+
+**Files:**
+- `/data/crypto-trader/paper_trading_bot.py` - Full paper trading with TP/SL tracking
+- `/data/crypto-trader/paper_state.json` - State (equity, positions, trades)
+- `/data/crypto-trader/paper_trades.json` - Trade log
+- `/data/crypto-trader/paper_daily.json` - Daily summaries
+
+**Telegram:** Token `8825978198:AAE9H8mYFv2j5oFZKVuXOQLzxDFW3yZUCys`, Chat `8048000483`
+
+**Bitunix API Working Configuration:**
+- Futures base: `https://fapi.bitunix.com`
+- Spot base (market data): `https://openapi.bitunix.com`
+- Signing: Double SHA256 with `marginCoinUSDT` (no =) for signature, `marginCoin=USDT` for URL
+- Timeout: 30s for account endpoint
+- SDK `pip install bitunix` works for SPOT only; futures needs manual signing
+
+**Signal Logic (Implemented):**
+- 4H: EMA 8/25/100 + ADX ≥ 20 → BULL/BEAR/RANGE
+- 1H: RSI + MACD histogram momentum
+- Look-ahead fix: Only CLOSED 4H candles
+- TP/SL: ATR-based (2.5x TP, 1.5x SL)
+- Position sizing: 1.5% risk, 20% max position, 3 max concurrent
+- Correlation: max 2 same-direction
+
 ## Incremental Optimization Workflow (User Preference)
 
 **Ali's workflow**: Test each fix SEPARATELY. Keep if better, discard if worse. Then combine only winners.

@@ -196,6 +196,47 @@ def build_report(account, positions, signals, state):
     return msg
 ```
 
+## Paper Trading Report Format (2026-07-26)
+
+```
+📄 <b>Paper Trading Bot</b>
+⏰ 2026-07-26 21:57:29
+==============================
+
+🎯 <b>Positions Closed:</b>
+  🟢 BTCUSDT LONG TP: $23.40 (+2.34%)
+
+💰 <b>Paper Account:</b>
+  Equity: $1,023.40
+  Daily PnL: $23.40
+  Open Positions: 1/3
+  Unrealized: $-5.20
+  Total Value: $1,018.20
+
+📊 <b>Open Positions:</b>
+  ETHUSDT LONG @ $1,850.00
+    Size: 0.27 | Current: $1,848.00
+    PnL: -0.11% | TP: $1,890.00 | SL: $1,820.00
+
+📈 <b>Market Scan:</b>
+  ⚪ BTCUSDT: $64,792 | RANGE | ADX:10 | RSI:54
+  ⚪ ETHUSDT: $1,861 | RANGE | ADX:3 | RSI:42
+  🟢 XRPUSDT: $1.09 | RANGE | ADX:20 | RSI:45
+    ⚡ <b>BUY</b> @ $1.09
+    TP: $1.12 | SL: $1.06
+
+🎯 <b>Executing 1 Signal(s):</b>
+  ✅ BUY XRPUSDT @ $1.09
+    Size: 0.45 | TP: $1.12 | SL: $1.06
+
+==============================
+📊 <b>Stats:</b>
+  Total Trades: 3
+  Win Rate: 66.7%
+  Equity: $1,023.40
+  Return: 2.3%
+```
+
 ## Message Length Guidelines
 
 - **Header:** ~50 chars

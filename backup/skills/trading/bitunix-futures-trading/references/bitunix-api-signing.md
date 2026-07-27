@@ -164,3 +164,71 @@ positions = client.get("/api/v1/futures/position/current")
 | `code: 10007, msg: "Signature Error"` | Wrong param format in signature | Use `marginCoinUSDT` not `marginCoin=USDT` |
 | `code: 1, msg: "Network Error"` | Timeout too short | Use 30s timeout for account endpoint |
 | `status: 404` | Wrong base URL | Use `fapi.bitunix.com` not `openapi.bitunix.com` |
+
+## Key Fixes Discovered (2026-07-26)
+
+### 1. Parameter Parsing Bug
+**Problem:** `marginCoinUSDT` was incorrectly parsed as `margin=CoinUSDT` instead of `marginCoin=USDT`.
+
+**Root Cause:** The `rfind("USDT")` approach finds the first occurrence from right, but `CoinUSDT` contains `USDT` in the middle.
+
+**Fix:** Use exact key matching:
+```python
+def _convert_params(self, params_str):
+    if not params_str or '=' in params_str:
+        return params_str
+    # Known param patterns
+    if params_str.endswith("CoinUSDT"):
+        return params_str[:-8] + "=" + params_str[-8:]  # marginCoin=USDT
+    elif params_str.endswith("USDT"):
+        return params_str[:-4] + "=" + params_str[-4:]   # symbol=BTCUSDT
+    return params_str
+```
+
+### 2. 30-Second Timeout Required
+**Problem:** Futures account endpoint (`/api/v1/futures/account`) consistently fails with "Network Error" on 10s timeout.
+
+**Fix:** Use 30s timeout for private endpoints:
+```python
+requests.get(url, headers=headers, timeout=30)
+```
+
+### 3. Cron Job Model Configuration
+**Problem:** Cron jobs fail with "no model configured" even when default model is set.
+
+**Fix:** Explicitly set model on cron creation/update:
+```python
+cronjob(action='update', job_id=..., model={"model": "nvidiarail", "provider": "openai-api"})
+```
+
+### 4. Paper Trading Complete Implementation
+Full paper trading bot with:
+- Position management (open/close/TP/SL tracking)
+- Daily PnL reset
+- Correlation limits (max 2 same-direction positions)
+- Risk-based position sizing (1.5% risk per trade)
+- ATR-based TP/SL (2.5x / 1.5x)
+- Full trade logging
+- Telegram hourly reports
+
+### 5. Working Bot Files (2026-07-27)
+**Active cron job:** `bitunix-paper-trading-2days` (every 60m, model: nvidiarail/openai-api)
+
+**Files:**
+- `/data/crypto-trader/paper_trading_bot.py` - Full paper trading with TP/SL tracking
+- `/data/crypto-trader/trading_bot.py` - Live bot template (DRY_RUN=True)
+- `/data/crypto-trader/bitunix_futures.py` - Minimal API client
+- `/data/crypto-trader/bot_config_final.json` - API keys stored
+- `/data/crypto-trader/paper_state.json` - Paper trading state
+- `/data/crypto-trader/paper_trades.json` - Trade log
+- `/data/crypto-trader/paper_daily.json` - Daily summaries
+
+**Telegram:** Token `8825978198:AAE9H8mYFv2j5oFZKVuXOQLzxDFW3yZUCys`, Chat `8048000483`
+
+**Signal Logic (Implemented):**
+- 4H: EMA 8/25/100 + ADX ≥ 20 → BULL/BEAR/RANGE
+- 1H: RSI + MACD histogram momentum
+- Look-ahead fix: Only CLOSED 4H candles
+- TP/SL: ATR-based (2.5x TP, 1.5x SL)
+- Position sizing: 1.5% risk, 20% max position, 3 max concurrent
+- Correlation: max 2 same-direction

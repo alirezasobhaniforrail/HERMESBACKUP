@@ -197,7 +197,108 @@ def generate_signal(regime, e8, e25, rsi, macd_hist, index):
         elif rsi[index] > 70 and macd_hist[index] < macd_hist[index-1]:
             return "SELL"
     return None
+---
+
+## Complete Analysis Function (Implemented in paper_trading_bot.py)
+
+```python
+def analyze_pair(api, symbol):
+    # Fetch data
+    klines_1h = api.get_klines(symbol, "60")    # 60 = 1H
+    klines_4h = api.get_klines(symbol, "240")   # 240 = 4H
+    
+    if not klines_1h.get('data') or len(klines_1h['data']) < 100: return None
+    if not klines_4h.get('data') or len(klines_4h['data']) < 50: return None
+    
+    # Parse OHLC
+    c1h = [float(k['close']) for k in klines_1h['data']]
+    h1h = [float(k['high']) for k in klines_1h['data']]
+    l1h = [float(k['low']) for k in klines_1h['data']]
+    c4h = [float(k['close']) for k in klines_4h['data']]
+    h4h = [float(k['high']) for k in klines_4h['data']]
+    l4h = [float(k['low']) for k in klines_4h['data']]
+    
+    # Indicators
+    e8 = calc_ema(c4h, 8)
+    e25 = calc_ema(c4h, 25)
+    e100 = calc_ema(c4h, 100)
+    adx = calc_adx(h4h, l4h, c4h)
+    rsi = calc_rsi(c1h)
+    macd, sig, hist = calc_macd(c1h)
+    atr = calc_atr(h1h, l1h, c1h)
+    
+    # Current indices (LAST CLOSED candles)
+    i4h = len(c4h) - 1
+    i1h = len(c1h) - 1
+    price = c1h[i1h]
+    
+    # Regime
+    if e8[i4h] > e25[i4h] > e100[i4h] and adx[i4h] >= 20: regime = "BULL"
+    elif e8[i4h] < e25[i4h] < e100[i4h] and adx[i4h] >= 20: regime = "BEAR"
+    else: regime = "RANGE"
+    
+    # Signals
+    signal = None
+    if regime == "BULL" and adx[i4h] >= 20:
+        if e8[i4h] > e25[i4h] and rsi[i1h] > 45 and hist[i1h] > hist[i1h-1]:
+            signal = "BUY"
+    elif regime == "BEAR" and adx[i4h] >= 20:
+        if e8[i4h] < e25[i4h] and rsi[i1h] < 55 and hist[i1h] < hist[i1h-1]:
+            signal = "SELL"
+    elif regime == "RANGE":
+        if rsi[i1h] < 30 and hist[i1h] > hist[i1h-1]:
+            signal = "BUY"
+        elif rsi[i1h] > 70 and hist[i1h] < hist[i1h-1]:
+            signal = "SELL"
+    
+    # TP/SL
+    tp = sl = None
+    atr_val = atr[i1h] if atr[i1h] > 0 else price * 0.01
+    atr_pct = atr_val / price
+    if signal == "BUY":
+        tp = price * (1 + atr_pct * 2.5)
+        sl = price * (1 - atr_pct * 1.5)
+    elif signal == "SELL":
+        tp = price * (1 - atr_pct * 2.5)
+        sl = price * (1 + atr_pct * 1.5)
+    
+    return {
+        'symbol': symbol, 'price': price, 'regime': regime,
+        'signal': signal, 'adx': adx[i4h], 'rsi': rsi[i1h],
+        'tp': tp, 'sl': sl, 'atr_pct': atr_pct
+    }
 ```
+
+---
+
+## Look-Ahead Bias Fix (Critical - 2026-07-27 Session)
+
+When using 4H indicators for 1H decisions:
+
+```python
+# WRONG - uses current (possibly unclosed) 4H candle
+j4 = min(len(c4)-1, max(0, int((ts - four_h_times[0]) / 14400000)))
+
+# WRONG - finds last 4H candle with OPEN time < current time (still open!)
+j4 = 0
+for jj in range(len(four_h_times)-1, -1, -1):
+    if four_h_times[jj] < ts:
+        j4 = jj
+        break
+
+# CORRECT - verifies candle is FULLY CLOSED
+j4 = 0
+for jj in range(len(four_h_times)-1, -1, -1):
+    if four_h_times[jj] + 14400000 <= ts:  # 4h = 14400000 ms
+        j4 = jj
+        break
+
+# A 4H candle at time T closes at T+14400000
+# At 09:00, the 08:00 candle is still open (closes at 12:00)
+# Last CLOSED candle is 04:00
+```
+
+The `paper_trading_bot.py` and `trading_bot.py` use `i4h = len(c4h) - 1` which correctly uses the LAST CLOSED 4H candle from the fetched data.
 
 ---
 
