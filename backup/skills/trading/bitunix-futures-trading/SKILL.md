@@ -268,6 +268,8 @@ When working with Ali:
 - `references/indicator-formulas.md` - Pure Python indicator implementations
 - `references/paper-trading-implementation.md` - Complete paper trading logic
 - `references/telegram-format.md` - Telegram message formatting
+- `references/bitunix-price-api-fix.md` - Ticker endpoint 404 fix using klines
+- `references/session-2026-07-28-learnings.md` - Session 2026-07-28 debugging and validation
 
 ## Templates
 - `templates/trading_bot_template.py` - Live trading bot template

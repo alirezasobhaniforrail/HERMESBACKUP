@@ -1,7 +1,7 @@
-# Bitunix Futures Working Implementation (2026-07-27 Session)
+# Bitunix Futures Working Implementation (2026-07-27/28 Sessions)
 
 ## Summary
-This session successfully built and deployed a working Bitunix Futures paper trading bot with real API connectivity, Telegram notifications, and hourly cron job.
+Successfully built and deployed a working Bitunix Futures paper trading bot with real API connectivity, Telegram notifications, and hourly cron job.
 
 ## Key Files Created
 
@@ -108,3 +108,38 @@ Content-Type: application/json
 3. Fund account with 1000 USDT
 4. Add exchange-level STOP_MARKET orders
 5. Implement kill switch and daily loss limits
+
+## Session 2026-07-28 Additional Learnings
+
+### 1. Price Ticker Endpoint - 404 Not Found
+**Problem**: `/api/spot/v1/market/tickers` returns 404
+```json
+{"timestamp": "2026-07-28T15:49:08.050+00:00", "status": 404, "error": "Not Found", "path": "/api/spot/v1/market/tickers"}
+```
+
+**Solution**: Use klines endpoint (which works) to get latest price:
+```python
+def get_price(self, symbol):
+    klines = self.get_klines(symbol, "1", 1)  # 1m interval
+    if klines.get('data') and len(klines['data']) > 0:
+        return float(klines['data'][0].get('close', 0))
+    return 0
+```
+
+### 2. get_price Bug in paper_trading_bot.py
+**Issue**: The `get_price` method used `params={"symbol": symbol}` which caused the API to return 404. The working `bitunix_futures.py` version calls the endpoint without params and filters locally.
+
+**Fix Applied**: Updated `get_price` in `paper_trading_bot.py` to use klines endpoint without symbol parameter.
+
+### 3. DOGEUSDT Position Closed via SL
+**Result**: Paper trading bot correctly detected SL hit and closed position
+- Entry: $0.07231 → SL: $0.07138
+- PnL: -$7.71 (-1.28%)
+- Duration: 15.4 hours
+- Fully logged in `paper_state.json` and `paper_trades.json`
+- Telegram report sent correctly
+
+### 4. Cron Job Status
+- Job `98c19ca9181a` (bitunix-paper-trading-2days) active and running
+- Last run: 2026-07-28 15:51:54 UTC - Status OK
+- Model explicitly configured: `{"model": "nvidiarail", "provider": "openai-api"}`
