@@ -1,0 +1,97 @@
+{
+  "jobs": [
+    {
+      "id": "a46587ee3456",
+      "name": "hermes-backup-12h",
+      "prompt": "Run the Hermes backup script",
+      "skills": [],
+      "skill": null,
+      "model": null,
+      "provider": null,
+      "provider_snapshot": null,
+      "model_snapshot": null,
+      "base_url": null,
+      "script": "hermes-backup.sh",
+      "no_agent": true,
+      "context_from": null,
+      "schedule": {
+        "kind": "interval",
+        "minutes": 720,
+        "display": "every 720m"
+      },
+      "schedule_display": "every 720m",
+      "repeat": {
+        "times": null,
+        "completed": 28
+      },
+      "enabled": true,
+      "state": "scheduled",
+      "paused_at": null,
+      "paused_reason": null,
+      "created_at": "2026-07-26T07:51:23.435825+00:00",
+      "next_run_at": "2026-08-09T19:57:19.439051+00:00",
+      "last_run_at": "2026-08-09T07:57:19.439051+00:00",
+      "last_status": "ok",
+      "last_error": null,
+      "last_delivery_error": null,
+      "deliver": "origin",
+      "origin": {
+        "platform": "telegram",
+        "chat_id": "8048000483",
+        "chat_name": "ali One",
+        "thread_id": null,
+        "user_id": "8048000483"
+      },
+      "enabled_toolsets": null,
+      "workdir": null,
+      "fire_claim": null
+    },
+    {
+      "id": "98c19ca9181a",
+      "name": "bitunix-paper-trading-2days",
+      "prompt": "Run the Bitunix Paper Trading Bot and report results. Execute: cd /data/crypto-trader && python3 paper_trading_bot.py. Report the output to Ali.",
+      "skills": [],
+      "skill": null,
+      "model": "nvidiarail",
+      "provider": "openai-api",
+      "provider_snapshot": null,
+      "model_snapshot": null,
+      "base_url": null,
+      "script": null,
+      "no_agent": false,
+      "context_from": null,
+      "schedule": {
+        "kind": "interval",
+        "minutes": 60,
+        "display": "every 60m"
+      },
+      "schedule_display": "every 60m",
+      "repeat": {
+        "times": null,
+        "completed": 318
+      },
+      "enabled": true,
+      "state": "scheduled",
+      "paused_at": null,
+      "paused_reason": null,
+      "created_at": "2026-07-26T21:22:41.599131+00:00",
+      "next_run_at": "2026-08-09T08:37:33.012807+00:00",
+      "last_run_at": "2026-08-09T07:37:33.012807+00:00",
+      "last_status": "ok",
+      "last_error": null,
+      "last_delivery_error": null,
+      "deliver": "origin",
+      "origin": {
+        "platform": "telegram",
+        "chat_id": "8048000483",
+        "chat_name": "ali One",
+        "thread_id": null,
+        "user_id": "8048000483"
+      },
+      "enabled_toolsets": null,
+      "workdir": null,
+      "fire_claim": null
+    }
+  ],
+  "updated_at": "2026-08-09T07:57:19.439236+00:00"
+}
